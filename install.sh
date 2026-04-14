@@ -44,21 +44,32 @@ done
 # The Stop hook we want to install:
 HOOK_CMD='if [ -f FEATURE_CONTEXT.md ]; then echo '"'"'A FEATURE_CONTEXT.md exists in this project. If meaningful decisions, rejected alternatives, new constraints, or progress were made in this session, run /anchor now to update it before the session ends. Skip if no substantive changes.'"'"'; else echo '"'"'No FEATURE_CONTEXT.md in this project. If this session involved substantive feature work (design decisions, implementation choices, rejected alternatives, multi-step scope), run /anchor-init [feature-name] to create one and capture the context. Skip for quick questions, exploration, or one-off fixes.'"'"'; fi'
 
-if ! command -v jq >/dev/null 2>&1; then
-  warn "jq not found; cannot safely merge settings.json."
-  warn "Install jq (https://stedolan.github.io/jq/) and re-run, or merge manually:"
-  warn "  see ${RAW_URL}/settings.json"
+# Fast path: no existing settings.json → write directly, no jq needed.
+if [[ ! -f "${SETTINGS_FILE}" ]]; then
+  if [[ "${SOURCE}" == "local" ]]; then
+    cp "${SCRIPT_DIR}/settings.json" "${SETTINGS_FILE}"
+  else
+    curl -fsSL "${RAW_URL}/settings.json" -o "${SETTINGS_FILE}"
+  fi
+  info "Created ${SETTINGS_FILE} with Stop hook"
+  info "Done. Restart Claude Code to pick up the new commands and hook."
   exit 0
 fi
 
-if [[ ! -f "${SETTINGS_FILE}" ]]; then
-  info "Creating new ${SETTINGS_FILE}"
-  echo '{}' > "${SETTINGS_FILE}"
-else
-  backup="${SETTINGS_FILE}.bak.$(date +%Y%m%d%H%M%S)"
-  cp "${SETTINGS_FILE}" "${backup}"
-  info "Backed up existing settings to ${backup}"
+# Existing settings.json → need jq to merge safely.
+if ! command -v jq >/dev/null 2>&1; then
+  warn "jq not found; cannot safely merge into existing ${SETTINGS_FILE}."
+  warn "Install jq and re-run:"
+  warn "  Windows:  winget install jqlang.jq    (or: scoop install jq)"
+  warn "  macOS:    brew install jq"
+  warn "  Linux:    apt install jq  /  dnf install jq"
+  warn "Or merge manually from: ${RAW_URL}/settings.json"
+  exit 0
 fi
+
+backup="${SETTINGS_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+cp "${SETTINGS_FILE}" "${backup}"
+info "Backed up existing settings to ${backup}"
 
 # Remove any existing claude-anchor hook (identified by the FEATURE_CONTEXT.md marker)
 # then append our hook. Idempotent: re-running install replaces the hook cleanly.
