@@ -66,41 +66,89 @@ if [[ ! -f "${SETTINGS_FILE}" ]]; then
   exit 0
 fi
 
-# Existing settings.json → need jq to merge safely.
-if ! command -v jq >/dev/null 2>&1; then
-  warn "jq not found; cannot safely merge into existing ${SETTINGS_FILE}."
-  warn "Install jq and re-run:"
-  warn "  Windows:  winget install jqlang.jq    (or: scoop install jq)"
-  warn "  macOS:    brew install jq"
-  warn "  Linux:    apt install jq  /  dnf install jq"
-  warn "Or merge manually from: ${RAW_URL}/settings.json"
-  exit 0
-fi
-
+# Existing settings.json → merge safely. Try jq first, then python as fallback.
 backup="${SETTINGS_FILE}.bak.$(date +%Y%m%d%H%M%S)"
 cp "${SETTINGS_FILE}" "${backup}"
 info "Backed up existing settings to ${backup}"
 
-# Remove any existing claude-anchor hook (identified by the FEATURE_CONTEXT.md marker)
-# then append our hook. Idempotent: re-running install replaces the hook cleanly.
-tmp=$(mktemp)
-jq --arg cmd "${HOOK_CMD}" '
-  .hooks //= {}
-  | .hooks.Stop //= []
-  | .hooks.Stop |= (
-      map(
-        if (.hooks? // []) | any(.command? // "" | test("FEATURE_CONTEXT\\.md"))
-        then
-          .hooks |= map(select((.command? // "") | test("FEATURE_CONTEXT\\.md") | not))
-        else . end
-      )
-      | map(select((.hooks? // []) | length > 0))
-    )
-  | .hooks.Stop += [{
-      "matcher": "",
-      "hooks": [{"type": "command", "command": $cmd}]
-    }]
-' "${SETTINGS_FILE}" > "${tmp}" && mv "${tmp}" "${SETTINGS_FILE}"
+if command -v jq >/dev/null 2>&1; then
+  MERGER="jq"
+elif command -v python3 >/dev/null 2>&1; then
+  MERGER="python3"
+elif command -v python >/dev/null 2>&1; then
+  MERGER="python"
+else
+  warn "Neither jq nor python found; cannot safely merge into existing ${SETTINGS_FILE}."
+  warn "Install one of them and re-run:"
+  warn "  Windows:  winget install jqlang.jq   (or install Python from python.org)"
+  warn "  macOS:    brew install jq            (or python3 is usually preinstalled)"
+  warn "  Linux:    apt install jq             (or apt install python3)"
+  warn "Or merge manually from: ${RAW_URL}/settings.json"
+  exit 0
+fi
 
-info "Merged Stop hook into ${SETTINGS_FILE}"
+tmp=$(mktemp)
+
+if [[ "${MERGER}" == "jq" ]]; then
+  # Remove any existing claude-anchor hook (identified by FEATURE_CONTEXT.md marker),
+  # then append. Idempotent: re-running install replaces the hook cleanly.
+  jq --arg cmd "${HOOK_CMD}" '
+    .hooks //= {}
+    | .hooks.Stop //= []
+    | .hooks.Stop |= (
+        map(
+          if (.hooks? // []) | any(.command? // "" | test("FEATURE_CONTEXT\\.md"))
+          then
+            .hooks |= map(select((.command? // "") | test("FEATURE_CONTEXT\\.md") | not))
+          else . end
+        )
+        | map(select((.hooks? // []) | length > 0))
+      )
+    | .hooks.Stop += [{
+        "matcher": "",
+        "hooks": [{"type": "command", "command": $cmd}]
+      }]
+  ' "${SETTINGS_FILE}" > "${tmp}" && mv "${tmp}" "${SETTINGS_FILE}"
+  info "Merged Stop hook via jq into ${SETTINGS_FILE}"
+else
+  # Python fallback: same idempotent merge as the jq version above.
+  HOOK_CMD="${HOOK_CMD}" SETTINGS_FILE="${SETTINGS_FILE}" OUT="${tmp}" "${MERGER}" - <<'PY'
+import json, os, sys
+
+settings_file = os.environ["SETTINGS_FILE"]
+out           = os.environ["OUT"]
+hook_cmd      = os.environ["HOOK_CMD"]
+
+with open(settings_file, "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+hooks = data.setdefault("hooks", {})
+stop_entries = hooks.setdefault("Stop", [])
+
+# Strip previous claude-anchor hooks (identified by FEATURE_CONTEXT.md marker).
+cleaned = []
+for entry in stop_entries:
+    inner = entry.get("hooks", []) or []
+    kept = [h for h in inner if "FEATURE_CONTEXT.md" not in (h.get("command") or "")]
+    if kept:
+        entry = dict(entry)
+        entry["hooks"] = kept
+        cleaned.append(entry)
+    elif not inner:
+        cleaned.append(entry)
+
+cleaned.append({
+    "matcher": "",
+    "hooks": [{"type": "command", "command": hook_cmd}],
+})
+hooks["Stop"] = cleaned
+
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(data, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PY
+  mv "${tmp}" "${SETTINGS_FILE}"
+  info "Merged Stop hook via ${MERGER} into ${SETTINGS_FILE}"
+fi
+
 info "Done. Restart Claude Code to pick up the new commands and hook."
