@@ -12,6 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/lunara-kim/claude-anchor/main/insta
 
 스크립트가 하는 일:
 - `~/.claude/commands/`에 anchor 커맨드 2개 복사 (`anchor.md`, `anchor-graduate.md`)
+- `~/.claude/anchor-hook.py` 설치 (Stop hook 로직)
 - `~/.claude/settings.json`에 Stop hook 병합 (기존 설정 보존, 백업 생성)
 - 이미 설치되어 있으면 hook을 깔끔히 교체 (중복 방지)
 - 구버전에서 설치된 `anchor-init.md`가 있으면 자동 제거 (기능은 `/anchor`에 통합됨)
@@ -67,18 +68,22 @@ cd ~/src/claude-anchor && git pull
 
 ## 자동 Anchor (기본 동작)
 
-사용자가 커맨드 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다.
+사용자가 커맨드 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다. 이 hook은 Claude Code 공식 스펙에 따라 `{"decision":"block","reason":"..."}` JSON 응답을 반환해서 **Claude가 reason을 읽고 실제로 행동**하도록 만듭니다 (단순 echo로는 Claude에게 전달되지 않음).
 
-Claude 응답이 끝날 때마다 현재 디렉토리를 체크해서 Claude에게 조건부 지시를 주입합니다:
+동작:
 
-- **`FEATURE_CONTEXT.md`가 있으면** → "이번 세션에 substantive work가 있었으면 `/anchor`로 업데이트하라"
-- **없으면** → "이번 세션이 substantive work였으면 `/anchor`로 생성하라" (self-bootstrap)
+1. Claude가 응답을 끝내려고 할 때 `anchor-hook.py`가 실행됨
+2. 현재 디렉토리에 `FEATURE_CONTEXT.md`가 있는지 확인
+3. **있으면** → "substantive work가 있었으면 `/anchor`로 업데이트하라"
+4. **없으면** → "substantive work였으면 `/anchor`로 생성하라" (self-bootstrap)
+5. Claude가 세션 내용을 보고 판단해서 실행 여부 결정
+6. 다시 종료 시도 시 `stop_hook_active=true` 플래그가 설정되어 hook이 조용히 통과 (무한 루프 방지)
 
-"substantive work"의 범위는 넓게 잡습니다 — 기능 구현, 테스트 인프라, 로깅 전략, 배포 파이프라인, 아키텍처 리팩터링, 툴링 셋업 등 **설계 선택이 개입된 모든 작업**이 포함됩니다. Claude가 세션 내용을 보고 판단하기 때문에 빠른 질문이나 단순 버그 수정에는 반응하지 않습니다.
+"substantive work"의 범위는 넓게 잡습니다 — 기능 구현, 테스트 인프라, 로깅 전략, 배포 파이프라인, 아키텍처 리팩터링, 툴링 셋업 등 **설계 선택이 개입된 모든 작업**이 포함됩니다. 빠른 질문이나 단순 버그 수정에는 Claude가 "substantive 아님"이라고 판단해서 그냥 종료합니다.
 
 즉, **피처 시작부터 종료까지 수동 개입 없이 자동으로 anchor가 관리됩니다.** 물론 수동으로도 언제든 `/anchor`, `/anchor-graduate`를 실행할 수 있습니다.
 
-자동화를 원치 않는 경우 `settings.json`의 `Stop` hook 부분만 제거하세요.
+자동화를 원치 않는 경우 `~/.claude/settings.json`의 `Stop` hook 부분만 제거하거나 `anchor-hook.py`를 삭제하세요.
 
 ## 전체 워크플로
 

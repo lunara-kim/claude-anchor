@@ -11,6 +11,7 @@ RAW_URL="https://raw.githubusercontent.com/lunara-kim/claude-anchor/main"
 CLAUDE_DIR="${HOME}/.claude"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
 SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
+HOOK_SCRIPT="${CLAUDE_DIR}/anchor-hook.py"
 COMMANDS=(anchor.md anchor-graduate.md)
 # Legacy command files to remove if present (older versions installed them)
 LEGACY_COMMANDS=(anchor-init.md)
@@ -50,9 +51,18 @@ for old in "${LEGACY_COMMANDS[@]}"; do
   fi
 done
 
-# 2) Merge settings.json
-# The Stop hook we want to install:
-HOOK_CMD='if [ -f FEATURE_CONTEXT.md ]; then echo '"'"'A FEATURE_CONTEXT.md exists in this project. If this session included substantive work (new decisions, rejected alternatives, new constraints, or progress on existing tasks), run /anchor now to update it before the session ends.'"'"'; else echo '"'"'No FEATURE_CONTEXT.md yet. If this session involved substantive work with design choices — feature implementation, testing infrastructure, logging strategy, deployment pipeline, architectural refactors, tooling setup, any multi-step scope — run /anchor now to create one and capture the context. Skip only for quick questions, pure exploration, or trivial fixes.'"'"'; fi'
+# 2) Install hook script
+if [[ "${SOURCE}" == "local" ]]; then
+  cp "${SCRIPT_DIR}/anchor-hook.py" "${HOOK_SCRIPT}"
+else
+  curl -fsSL "${RAW_URL}/anchor-hook.py" -o "${HOOK_SCRIPT}"
+fi
+chmod +x "${HOOK_SCRIPT}" 2>/dev/null || true
+info "Installed ${HOOK_SCRIPT}"
+
+# 3) Merge settings.json
+# The Stop hook command that invokes our hook script.
+HOOK_CMD='python3 "$HOME/.claude/anchor-hook.py" 2>/dev/null || python "$HOME/.claude/anchor-hook.py"'
 
 # Fast path: no existing settings.json → write directly, no jq needed.
 if [[ ! -f "${SETTINGS_FILE}" ]]; then
@@ -92,14 +102,16 @@ tmp=$(mktemp)
 if [[ "${MERGER}" == "jq" ]]; then
   # Remove any existing claude-anchor hook (identified by FEATURE_CONTEXT.md marker),
   # then append. Idempotent: re-running install replaces the hook cleanly.
+  # Marker matches either legacy inline hook (FEATURE_CONTEXT.md) or
+  # current script-based hook (anchor-hook.py).
   jq --arg cmd "${HOOK_CMD}" '
     .hooks //= {}
     | .hooks.Stop //= []
     | .hooks.Stop |= (
         map(
-          if (.hooks? // []) | any(.command? // "" | test("FEATURE_CONTEXT\\.md"))
+          if (.hooks? // []) | any(.command? // "" | test("FEATURE_CONTEXT\\.md|anchor-hook\\.py"))
           then
-            .hooks |= map(select((.command? // "") | test("FEATURE_CONTEXT\\.md") | not))
+            .hooks |= map(select((.command? // "") | test("FEATURE_CONTEXT\\.md|anchor-hook\\.py") | not))
           else . end
         )
         | map(select((.hooks? // []) | length > 0))
@@ -125,11 +137,14 @@ with open(settings_file, "r", encoding="utf-8") as f:
 hooks = data.setdefault("hooks", {})
 stop_entries = hooks.setdefault("Stop", [])
 
-# Strip previous claude-anchor hooks (identified by FEATURE_CONTEXT.md marker).
+# Strip previous claude-anchor hooks (legacy FEATURE_CONTEXT.md marker
+# or current anchor-hook.py marker).
 cleaned = []
 for entry in stop_entries:
     inner = entry.get("hooks", []) or []
-    kept = [h for h in inner if "FEATURE_CONTEXT.md" not in (h.get("command") or "")]
+    def _is_ours(cmd: str) -> bool:
+        return "FEATURE_CONTEXT.md" in cmd or "anchor-hook.py" in cmd
+    kept = [h for h in inner if not _is_ours(h.get("command") or "")]
     if kept:
         entry = dict(entry)
         entry["hooks"] = kept

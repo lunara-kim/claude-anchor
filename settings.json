@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f FEATURE_CONTEXT.md ]; then echo 'A FEATURE_CONTEXT.md exists in this project. If this session included substantive work (new decisions, rejected alternatives, new constraints, or progress on existing tasks), run /anchor now to update it before the session ends.'; else echo 'No FEATURE_CONTEXT.md yet. If this session involved substantive work with design choices — feature implementation, testing infrastructure, logging strategy, deployment pipeline, architectural refactors, tooling setup, any multi-step scope — run /anchor now to create one and capture the context. Skip only for quick questions, pure exploration, or trivial fixes.'; fi"
+            "command": "python3 \"$HOME/.claude/anchor-hook.py\" 2>/dev/null || python \"$HOME/.claude/anchor-hook.py\""
           }
         ]
       }
