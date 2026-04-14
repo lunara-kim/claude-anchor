@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f FEATURE_CONTEXT.md ]; then echo 'A FEATURE_CONTEXT.md exists in this project. If meaningful decisions, rejected alternatives, new constraints, or progress were made in this session, run /anchor now to update it before the session ends. Skip if no substantive changes.'; else echo 'No FEATURE_CONTEXT.md in this project. If this session involved substantive feature work (design decisions, implementation choices, rejected alternatives, multi-step scope), run /anchor-init [feature-name] to create one and capture the context. Skip for quick questions, exploration, or one-off fixes.'; fi"
+            "command": "if [ -f FEATURE_CONTEXT.md ]; then echo 'A FEATURE_CONTEXT.md exists in this project. If this session included substantive work (new decisions, rejected alternatives, new constraints, or progress on existing tasks), run /anchor now to update it before the session ends.'; else echo 'No FEATURE_CONTEXT.md yet. If this session involved substantive work with design choices — feature implementation, testing infrastructure, logging strategy, deployment pipeline, architectural refactors, tooling setup, any multi-step scope — run /anchor now to create one and capture the context. Skip only for quick questions, pure exploration, or trivial fixes.'; fi"
           }
         ]
       }

@@ -11,7 +11,9 @@ RAW_URL="https://raw.githubusercontent.com/lunara-kim/claude-anchor/main"
 CLAUDE_DIR="${HOME}/.claude"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
 SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
-COMMANDS=(anchor.md anchor-init.md anchor-graduate.md)
+COMMANDS=(anchor.md anchor-graduate.md)
+# Legacy command files to remove if present (older versions installed them)
+LEGACY_COMMANDS=(anchor-init.md)
 
 info()  { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m!!\033[0m  %s\n' "$*" >&2; }
@@ -40,9 +42,17 @@ for cmd in "${COMMANDS[@]}"; do
   info "Installed ${dest}"
 done
 
+# Clean up legacy files (anchor-init.md was merged into anchor.md)
+for old in "${LEGACY_COMMANDS[@]}"; do
+  if [[ -f "${COMMANDS_DIR}/${old}" ]]; then
+    rm "${COMMANDS_DIR}/${old}"
+    info "Removed legacy ${COMMANDS_DIR}/${old} (functionality merged into /anchor)"
+  fi
+done
+
 # 2) Merge settings.json
 # The Stop hook we want to install:
-HOOK_CMD='if [ -f FEATURE_CONTEXT.md ]; then echo '"'"'A FEATURE_CONTEXT.md exists in this project. If meaningful decisions, rejected alternatives, new constraints, or progress were made in this session, run /anchor now to update it before the session ends. Skip if no substantive changes.'"'"'; else echo '"'"'No FEATURE_CONTEXT.md in this project. If this session involved substantive feature work (design decisions, implementation choices, rejected alternatives, multi-step scope), run /anchor-init [feature-name] to create one and capture the context. Skip for quick questions, exploration, or one-off fixes.'"'"'; fi'
+HOOK_CMD='if [ -f FEATURE_CONTEXT.md ]; then echo '"'"'A FEATURE_CONTEXT.md exists in this project. If this session included substantive work (new decisions, rejected alternatives, new constraints, or progress on existing tasks), run /anchor now to update it before the session ends.'"'"'; else echo '"'"'No FEATURE_CONTEXT.md yet. If this session involved substantive work with design choices — feature implementation, testing infrastructure, logging strategy, deployment pipeline, architectural refactors, tooling setup, any multi-step scope — run /anchor now to create one and capture the context. Skip only for quick questions, pure exploration, or trivial fixes.'"'"'; fi'
 
 # Fast path: no existing settings.json → write directly, no jq needed.
 if [[ ! -f "${SETTINGS_FILE}" ]]; then
