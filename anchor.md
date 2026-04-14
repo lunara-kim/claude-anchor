@@ -5,65 +5,65 @@ allowed-tools: Read, Write, Bash(date:*), Bash(ls:*), Bash(cat:*)
 
 # /anchor — Context Anchoring
 
-세션에서 내린 결정들을 로컬 feature 문서(`FEATURE_CONTEXT.md`)에 저장합니다.
-파일이 없으면 자동으로 생성하고, 있으면 업데이트합니다.
+Persist the decisions made during this session to a local feature document (`FEATURE_CONTEXT.md`).
+Creates the file if it does not exist, updates it if it does.
 
-## 작동 방식
+## How it works
 
-1. **현재 디렉토리 확인**: `FEATURE_CONTEXT.md`가 있는지 확인합니다.
+1. **Check current directory**: look for `FEATURE_CONTEXT.md`.
 
-2. **없으면 생성 (self-bootstrap)**:
-   - $ARGUMENTS에 기능명이 있으면 그걸 사용합니다.
-   - 없으면 현재 대화 맥락에서 기능명을 추론합니다 (예: "테스트 스위트 도입", "이메일 알림 기능").
-   - 애매하면 사용자에게 짧게 물어봅니다.
-   - 아래 "문서 형식"대로 새 파일을 만든 뒤, 이번 세션의 결정/제약/상태를 즉시 채웁니다.
+2. **If missing → create (self-bootstrap)**:
+   - If `$ARGUMENTS` contains a feature name, use it.
+   - Otherwise infer the feature name from the current conversation (e.g., "introduce test suite", "email notification feature").
+   - If ambiguous, briefly ask the user.
+   - Create a new file using the "Document format" below, then immediately fill in this session's decisions / constraints / state.
 
-3. **있으면 업데이트**:
-   - 기존 파일을 읽어 현재 상태를 파악합니다.
-   - 이번 세션에서 새로 나온 결정/제약/질문/진행 상태를 추가/갱신합니다.
+3. **If present → update**:
+   - Read the existing file to understand current state.
+   - Add or refresh decisions / constraints / questions / progress from this session.
 
-## 문서 형식
+## Document format
 
 ```markdown
-# Feature: [기능명]
-_생성일: [날짜] | 마지막 업데이트: [날짜]_
+# Feature: [name]
+_Created: [date] | Last updated: [date]_
 
-> 이 파일은 Context Anchoring 문서입니다.
-> 새 세션 시작 시 이 파일을 Claude에게 공유하세요.
-> `/anchor` 커맨드로 세션이 끝날 때마다 업데이트하세요.
-> 피처 완료 시 `/anchor-graduate`로 핵심 결정을 ADR로 승격하세요.
+> This file is a Context Anchoring document.
+> Share it with Claude when starting a new session.
+> Run `/anchor` at the end of each session to update it.
+> When the feature is complete, run `/anchor-graduate` to promote key decisions to ADRs.
 
 ## Decisions
-| 결정 | 이유 | 거절한 대안 |
-|------|------|------------|
+| Decision | Rationale | Rejected alternatives |
+|----------|-----------|-----------------------|
 | ... | ... | ... |
 
 ## Constraints
 - ...
 
 ## Open Questions
-- [ ] 미해결 질문
-- [x] 해결된 질문 (해결 방법: ...)
+- [ ] Unresolved question
+- [x] Resolved question (resolution: ...)
 
 ## State
-- [x] 완료된 작업
-- [ ] 다음 세션에서 할 작업
+- [x] Completed work
+- [ ] Work for the next session
 
 ## Session Log
-### [날짜]
-- 이번 세션에서 한 주요 작업 요약
+### [date]
+- Summary of the main work done in this session
 ```
 
-## 실행 지침
+## Execution guide
 
-1. `FEATURE_CONTEXT.md` 존재 여부에 따라 생성 또는 업데이트 모드로 진입합니다.
-2. 이번 대화에서 새로 결정된 것들을 Decisions 테이블에 추가합니다.
-3. 새로운 제약사항이 생겼으면 Constraints에 추가합니다.
-4. Open Questions를 최신 상태로 업데이트합니다 (해결된 건 [x], 새로 생긴 건 [ ]).
-5. State 체크리스트를 현재 진행 상황에 맞게 업데이트합니다.
-6. Session Log에 오늘 날짜와 이번 세션 요약을 추가합니다.
-7. 파일을 저장하고 저장된 내용을 간략히 보고합니다.
+1. Enter create or update mode based on whether `FEATURE_CONTEXT.md` exists.
+2. Add newly made decisions from this conversation to the Decisions table.
+3. Add any new constraints to Constraints.
+4. Update Open Questions to the latest state (resolved → [x], new → [ ]).
+5. Update the State checklist to reflect current progress.
+6. Append today's date and this session's summary to Session Log.
+7. Save the file and briefly report what was written.
 
-**중요**:
-- 결정의 *이유*와 *거절한 대안*을 반드시 기록합니다. "무엇을 했는가"보다 "왜 했는가"가 더 중요합니다.
-- "substantive work"의 범위는 넓게 해석합니다 — 기능 추가뿐 아니라 테스트 인프라, 로깅 전략, 배포 파이프라인, 아키텍처 리팩터링 등 **설계 선택이 개입된 모든 작업**을 포함합니다. 단순 버그 수정이나 포맷팅은 제외합니다.
+**Important**:
+- Always record the *rationale* and *rejected alternatives* for each decision. "Why" matters more than "what".
+- Interpret "substantive work" broadly — not only feature additions, but also test infrastructure, logging strategy, deployment pipelines, architectural refactors, and any work that **involves design choices**. Trivial bug fixes or formatting do not count.

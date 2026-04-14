@@ -1,69 +1,72 @@
-# Feature: claude-anchor — Context Anchoring 슬래시 커맨드 도구
-_생성일: 2026-04-15 | 마지막 업데이트: 2026-04-15_
+# Feature: claude-anchor — Context Anchoring slash-command tool
+_Created: 2026-04-15 | Last updated: 2026-04-15_
 
-> 이 파일은 Context Anchoring 문서입니다.
-> 새 세션 시작 시 이 파일을 Claude에게 공유하세요.
-> `/anchor` 커맨드로 세션이 끝날 때마다 업데이트하세요.
-> 피처 완료 시 `/anchor-graduate`로 핵심 결정을 ADR로 승격하세요.
+> This file is a Context Anchoring document.
+> Share it with Claude when starting a new session.
+> Run `/anchor` at the end of each session to update it.
+> When the feature is complete, run `/anchor-graduate` to promote key decisions to ADRs.
 
 ## Decisions
 
-| 결정 | 이유 | 거절한 대안 |
-|------|------|------------|
-| `/anchor-init`을 `/anchor`에 통합 (self-bootstrap) | 별도 init 커맨드를 두는 건 사용 마찰만 늘림. `/anchor`가 파일 없으면 생성, 있으면 업데이트하면 사용자는 "세션 끝나면 `/anchor`" 한 동작만 기억하면 됨. 실제 meeting-scribe 세션에서 `/anchor-init` 누락으로 auto-trigger 실패한 것이 증거. | `/anchor-init` 유지 (과잉 분리) / 두 커맨드 별칭화 (해결 안 됨, 여전히 두 개 존재) |
-| Stop hook을 `echo` stdout 대신 `{"decision":"block","reason":"..."}` JSON 응답으로 구현 | Claude Code 공식 스펙상 Stop hook stdout은 디버그 로그로만 가고 Claude에게 전달되지 않음. `decision:block`은 `reason`을 Claude에게 피드백으로 주입하는 유일한 공식 메커니즘. | stdout echo (동작 안 함, 실제 검증됨) / SessionEnd hook (세션 종료 후 실행이라 의미 없음) / UserPromptSubmit hook (세션 시작에만 트리거, 종료 자동화 불가) |
-| 무한 루프 방지는 Claude Code 제공 `stop_hook_active` 플래그로 | 공식적으로 보장되는 escape hatch. hook이 받는 stdin JSON에 포함됨. 자체 세션 마커 파일보다 단순하고 신뢰 가능. | 세션 ID 기반 `/tmp/marker-{session_id}` 파일 (복잡, OS별 경로 이슈, 정리 필요) / 1회 카운터 (상태 관리 부담) |
-| Hook 로직을 `anchor-hook.py` 별도 스크립트로 분리 | JSON 파싱과 분기 로직을 bash 인라인으로 쓰면 escaping 지옥. settings.json의 command 필드는 스크립트를 호출하는 한 줄로만. | 거대한 bash 인라인 (가독성 최악, 유지보수 불가) / Node.js 스크립트 (claude-anchor 쓸 사용자에게 Node 요구 과함) |
-| 설치 시 settings.json 병합을 `jq` 선호 + `python3`/`python` fallback | `jq`는 Windows Git Bash 기본 설치 안 됨. Python은 Windows/macOS/Linux 어디든 거의 있음. 자동 package install은 sudo/신뢰 문제로 하지 않음. | jq 강제 요구 (Windows 사용자 barrier) / jq 자동 설치 (OS별 복잡, 권한 이슈) / 수동 병합만 안내 (UX 최악) |
-| 구 anchor-init 버전에서 업그레이드 시 `anchor-init.md` 자동 삭제 | 남아있으면 `/anchor-init` 커맨드가 여전히 노출되어 사용자 혼란. 사라진 커맨드를 이름으로 명시해 clean 마이그레이션. | 그대로 두고 README 경고 (사용자 실수 유발) / deprecation 메시지 stub 파일 (dead code) |
-| Stop hook의 "substantive work" 정의를 **넓게** (testing/logging/deploy/tooling 포함) | meeting-scribe에서 테스트 스위트 도입이 "feature work 아님"으로 읽혀 auto-init이 안 발동한 실패 사례 있음. 설계 선택이 개입된 작업은 전부 포함. | 좁은 정의 "feature implementation만" (실제 실패 경험으로 기각) / 모든 작업 포함 (빠른 질문에도 발동해 노이즈) |
+| Decision | Rationale | Rejected alternatives |
+|----------|-----------|-----------------------|
+| Merge `/anchor-init` into `/anchor` (self-bootstrap) | A separate init command only added usage friction. If `/anchor` creates the file when missing and updates it when present, the user only has to remember one action: "run `/anchor` at the end of a session." Real meeting-scribe sessions proved the gap: auto-trigger failed because `/anchor-init` had not been run. | Keep `/anchor-init` as a separate command (over-separation). / Alias the two commands (does not fix the problem; two commands still exist). |
+| Implement the Stop hook as a `{"decision":"block","reason":"..."}` JSON response instead of an `echo` to stdout | Per the Claude Code spec, Stop hook stdout goes only to debug logs and is not surfaced to Claude. `decision:block` with `reason` is the only official mechanism to inject feedback into Claude. | stdout echo (verified broken). / SessionEnd hook (runs after the session ends, useless here). / UserPromptSubmit hook (fires at session start; cannot automate session end). |
+| Use Claude Code's `stop_hook_active` flag to prevent infinite loops | An officially guaranteed escape hatch, delivered in the hook's stdin JSON. Simpler and more trustworthy than managing a custom session marker file. | Session-ID-based marker file at `/tmp/marker-{session_id}` (complex, OS path issues, needs cleanup). / One-shot counter (additional state to manage). |
+| Keep hook logic in a separate `anchor-hook.py` script | Inlining JSON parsing and branching in bash becomes an escaping nightmare. The `command` field in settings.json should be a single line invoking a script. | Giant bash inline (unreadable, unmaintainable). / Node.js script (requiring Node for claude-anchor users is too heavy). |
+| Prefer `jq` and fall back to `python3`/`python` when merging settings.json during install | `jq` is not bundled with Windows Git Bash. Python is almost always available on Windows / macOS / Linux. Auto-installing packages is avoided due to sudo/trust issues. | Require `jq` (barrier for Windows users). / Auto-install `jq` (OS-specific, permission-heavy). / Manual-merge instructions only (worst UX). |
+| Automatically remove `anchor-init.md` when upgrading from older versions | If left behind, `/anchor-init` remains visible to users and causes confusion about a removed command. Naming the vanished command makes the migration clean. | Leave it and warn in README (invites mistakes). / Ship a deprecation-stub file (dead code). |
+| Define "substantive work" for the Stop hook **broadly** (testing / logging / deploy / tooling included) | In the meeting-scribe project, introducing a test suite was interpreted as "not feature work", so auto-init did not fire. Anything involving design choices should qualify. | Narrow definition ("only feature implementation") — already disproved in practice. / Include everything — fires on quick questions too, causing noise. |
 
 ## Constraints
 
-- Stop hook은 Claude Code 공식 스펙에 제약됨 — `decision:block` 외에는 Claude에게 추가 행동 유도 불가
-- `jq`는 Windows Git Bash 기본 미설치 — Python fallback 필수
-- `anchor-hook.py`는 Python 3.6+ 문법만 사용 (widely available)
-- Hook 경로는 `$HOME/.claude/anchor-hook.py` 고정 — 다른 위치 지원하면 settings.json 동기화 복잡
-- Slash command 파일은 `.claude/commands/*.md` 위치 규약 고정 (Claude Code 스펙)
+- Bounded by the Claude Code Stop hook spec — nothing other than `decision:block` can instruct Claude to take additional action.
+- `jq` is not preinstalled in Windows Git Bash — Python fallback is mandatory.
+- `anchor-hook.py` must stick to Python 3.6+ syntax (widely available).
+- Hook path is fixed to `$HOME/.claude/anchor-hook.py` — supporting alternatives would complicate settings.json synchronization.
+- Slash command files must live at `.claude/commands/*.md` per the Claude Code spec.
 
 ## Open Questions
 
-- [ ] Graduate 자동화 가능성 — 피처 "완료" 시점은 사람만 아는 도메인 지식이라 현재 수동. 커밋 메시지나 PR merge 같은 이벤트로 유도할 수 있을지?
-- [ ] Project-local settings.json 배포 패턴 — `.claude/settings.json`을 git commit 하는 팀 대상 설치 플로우 개선 여지
-- [ ] Hook이 메시지를 띄우는 빈도 조절 — 현재는 세션당 1회 확정 발동. 사용자가 "빠른 질문"이라 판단하면 자동 skip되도록 프롬프트 개선 여지
-- [ ] `/anchor`가 자동 발동될 때 기능명 추론 — 현재는 Claude가 대화 맥락에서 추론. 부정확하면 파일명/섹션이 어색해짐
-- [ ] macOS/Linux 환경 실제 테스트 — 현재 Windows Git Bash에서만 검증. `$HOME` 확장, 경로 구분자, Python 명령어 이름 등 이슈 가능성
+- [ ] Can graduation be automated? "Feature complete" is domain knowledge only humans have today, so it is manual. Could events like a commit message or PR merge drive it?
+- [ ] Distribution pattern for project-local `settings.json` — improve the install flow for teams that commit `.claude/settings.json`.
+- [ ] Tuning how often the hook speaks up — currently it fires once per session. Refine the prompt so Claude reliably skips when it is "just a quick question".
+- [ ] Feature-name inference when `/anchor` auto-fires — Claude infers from conversation; if it is wrong, the filename and section headings feel off.
+- [ ] Actual macOS / Linux testing — verified only on Windows Git Bash so far. Possible issues: `$HOME` expansion, path separators, `python` vs `python3` name resolution.
+- [ ] English-first distribution — README / command docs translated to English; may need further copy passes before an `awesome-claude-code` PR.
 
 ## State
 
-- [x] `/anchor`, `/anchor-graduate` 커맨드 작성 및 self-bootstrap 로직
-- [x] Stop hook을 `decision:block` JSON 응답 기반으로 재구현
-- [x] `anchor-hook.py` Python 스크립트 분리
-- [x] `stop_hook_active` 플래그로 루프 방지
-- [x] `install.sh` (jq + Python fallback, 레거시 정리)
-- [x] Windows Git Bash에서 설치/실행 검증
-- [x] README 전체 재작성 (설치/업데이트/워크플로)
-- [ ] macOS/Linux 환경 실제 테스트
-- [ ] awesome-claude-code 리포지토리 PR 제출
-- [ ] 실제 프로젝트(meeting-scribe 등)에서 auto-trigger 장기 관찰
+- [x] Write `/anchor` and `/anchor-graduate` commands; self-bootstrap logic
+- [x] Re-implement the Stop hook based on `decision:block` JSON responses
+- [x] Split into `anchor-hook.py` Python script
+- [x] Prevent loops with `stop_hook_active`
+- [x] `install.sh` (jq + Python fallback, legacy cleanup)
+- [x] Verified install/run on Windows Git Bash
+- [x] README rewritten end-to-end (install / update / workflow)
+- [x] Translate command docs and README to English (Korean kept in `README.ko.md`)
+- [ ] Actual macOS / Linux testing
+- [ ] Submit PR to awesome-claude-code
+- [ ] Long-term observation of auto-trigger behavior in real projects (e.g., meeting-scribe)
 
 ## Session Log
 
 ### 2026-04-14
-- 초기 구상: Martin Fowler Context Anchoring 글 읽고 Claude Code 슬래시 커맨드로 구현
-- `/anchor-init`, `/anchor`, `/anchor-graduate` 3개 커맨드 작성
-- GitHub 레포 `lunara-kim/claude-anchor` 생성, 초기 push
-- Stop hook 추가 (초기 echo 방식)
-- `install.sh` 작성 + Python fallback 추가 (jq 부재 환경 대응)
-- meeting-scribe 실전 사용: 테스트 스위트 도입 시 auto-init이 발동 안 하는 gap 발견
+- Initial idea: read Martin Fowler's Context Anchoring article; implement as Claude Code slash commands.
+- Wrote `/anchor-init`, `/anchor`, `/anchor-graduate` as three commands.
+- Created `lunara-kim/claude-anchor` on GitHub; initial push.
+- Added the Stop hook (initial echo-based version).
+- Wrote `install.sh` with a Python fallback (for environments without `jq`).
+- Real-world use in meeting-scribe: discovered that auto-init did not fire when a test suite was introduced.
 
 ### 2026-04-15
-- 구조적 로깅 도입 세션에서 auto-trigger 재차 실패 관찰
-- 원인 조사: Claude Code 공식 문서 확인 결과 Stop hook stdout은 Claude에게 전달되지 않음이 확정
-- `decision:block` + `reason` JSON 응답으로 메커니즘 전환 → Claude가 실제로 reason 읽고 행동
-- `stop_hook_active` 플래그로 무한 루프 방지
-- `anchor-hook.py` 별도 스크립트로 분리 (bash 인라인 JSON 조작 회피)
-- `/anchor-init`을 `/anchor`에 통합 (self-bootstrap) — 사용 마찰 제거
-- Stop hook "substantive work" 정의 확대 (testing/logging/deploy/tooling 포함)
-- 실제 hook 발동 검증 완료 (이 세션에서 `Stop hook feedback` 수신 확인)
-- 이 도구 자체에 대한 `FEATURE_CONTEXT.md` 작성 (meta-anchoring)
+- Observed the auto-trigger fail again during a structured-logging session.
+- Root cause investigation: the Claude Code docs confirm that Stop hook stdout is not propagated to Claude.
+- Switched the mechanism to a `decision:block` + `reason` JSON response — Claude now actually reads the reason and acts.
+- Added `stop_hook_active` flag handling to prevent infinite loops.
+- Split the hook into a standalone `anchor-hook.py` (avoid inline bash JSON manipulation).
+- Merged `/anchor-init` into `/anchor` (self-bootstrap) — removes usage friction.
+- Broadened the Stop hook's definition of "substantive work" (testing / logging / deploy / tooling included).
+- Verified live hook firing (`Stop hook feedback` observed in this session).
+- Wrote this `FEATURE_CONTEXT.md` for the tool itself (meta-anchoring).
+- Translated command docs and README to English for community distribution; preserved the Korean README as `README.ko.md`. Target: submit to `awesome-claude-code`.

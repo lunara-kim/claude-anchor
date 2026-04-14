@@ -1,25 +1,27 @@
-# Context Anchoring Slash Commands
+# Context Anchoring Slash Commands for Claude Code
 
-Martin Fowler의 [Context Anchoring](https://martinfowler.com/articles/reduce-friction-ai/context-anchoring.html) 패턴을 Claude Code 슬래시 커맨드로 구현한 것입니다.
+An implementation of Martin Fowler's [Context Anchoring](https://martinfowler.com/articles/reduce-friction-ai/context-anchoring.html) pattern as Claude Code slash commands, with automatic anchoring via a `Stop` hook.
 
-## 설치
+> Korean version: [README.ko.md](README.ko.md)
 
-### 원라이너 (권장)
+## Install
+
+### One-liner (recommended)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lunara-kim/claude-anchor/main/install.sh | bash
 ```
 
-스크립트가 하는 일:
-- `~/.claude/commands/`에 anchor 커맨드 2개 복사 (`anchor.md`, `anchor-graduate.md`)
-- `~/.claude/anchor-hook.py` 설치 (Stop hook 로직)
-- `~/.claude/settings.json`에 Stop hook 병합 (기존 설정 보존, 백업 생성)
-- 이미 설치되어 있으면 hook을 깔끔히 교체 (중복 방지)
-- 구버전에서 설치된 `anchor-init.md`가 있으면 자동 제거 (기능은 `/anchor`에 통합됨)
+What the script does:
+- Copies two anchor commands (`anchor.md`, `anchor-graduate.md`) to `~/.claude/commands/`.
+- Installs `~/.claude/anchor-hook.py` (the Stop hook logic).
+- Merges the Stop hook into `~/.claude/settings.json` (preserves existing settings, creates a timestamped backup).
+- Replaces any previously installed claude-anchor hook cleanly (no duplicates).
+- Removes the legacy `anchor-init.md` if present (its behavior is merged into `/anchor`).
 
-> 기존 `~/.claude/settings.json`이 있는 경우에만 `jq`가 필요합니다. 없으면 스크립트가 안내합니다.
+> `jq` is only required when you already have a `~/.claude/settings.json`. If `jq` is missing, the script falls back to `python3`/`python`.
 
-### 수동 설치
+### Manual install
 
 ```bash
 git clone https://github.com/lunara-kim/claude-anchor
@@ -27,14 +29,14 @@ cd claude-anchor
 ./install.sh
 ```
 
-또는 완전 수동:
+Or fully manual:
 ```bash
 mkdir -p ~/.claude/commands
 cp anchor.md anchor-graduate.md ~/.claude/commands/
-# settings.json은 기존 파일과 수동 병합
+# Merge settings.json manually with your existing one.
 ```
 
-### 프로젝트용 (팀 공유)
+### Per-project install (team-shared)
 
 ```bash
 mkdir -p .claude/commands
@@ -42,82 +44,84 @@ cp anchor.md anchor-graduate.md .claude/commands/
 cp settings.json .claude/settings.json
 ```
 
-## 업데이트
+## Update
 
-설치 방식에 따라:
+Depending on how you installed:
 
-**원라이너로 설치한 경우** — 같은 커맨드 재실행
+**One-liner** — just re-run the same command:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/lunara-kim/claude-anchor/main/install.sh | bash
 ```
-기존 hook은 마커로 식별해 교체하므로 중복되지 않습니다. settings.json은 실행 시마다 타임스탬프 백업됩니다.
+The installer identifies the existing hook by marker and replaces it, so nothing gets duplicated. `settings.json` is backed up with a timestamp on every run.
 
-**git clone으로 설치한 경우**
+**git clone**:
 ```bash
 cd claude-anchor && git pull && ./install.sh
 ```
 
-**symlink로 설치한 경우** (고급) — 소스를 한 번만 clone하고 심볼릭 링크
+**Symlink (advanced)** — clone once, symlink, and `git pull` to update:
 ```bash
 git clone https://github.com/lunara-kim/claude-anchor ~/src/claude-anchor
 ln -sf ~/src/claude-anchor/anchor.md          ~/.claude/commands/
 ln -sf ~/src/claude-anchor/anchor-graduate.md ~/.claude/commands/
-# 업데이트는 git pull만 하면 자동 반영
 cd ~/src/claude-anchor && git pull
 ```
 
-## 자동 Anchor (기본 동작)
+## Automatic anchoring (default)
 
-사용자가 커맨드 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다. 이 hook은 Claude Code 공식 스펙에 따라 `{"decision":"block","reason":"..."}` JSON 응답을 반환해서 **Claude가 reason을 읽고 실제로 행동**하도록 만듭니다 (단순 echo로는 Claude에게 전달되지 않음).
+So that context is not lost when you forget to run the command, `settings.json` ships with a **Stop hook**. Per the Claude Code spec, the hook returns a `{"decision":"block","reason":"..."}` JSON response so that **Claude actually reads the reason and acts on it** — a plain stdout echo is not propagated to Claude.
 
-동작:
+Flow:
 
-1. Claude가 응답을 끝내려고 할 때 `anchor-hook.py`가 실행됨
-2. 현재 디렉토리에 `FEATURE_CONTEXT.md`가 있는지 확인
-3. **있으면** → "substantive work가 있었으면 `/anchor`로 업데이트하라"
-4. **없으면** → "substantive work였으면 `/anchor`로 생성하라" (self-bootstrap)
-5. Claude가 세션 내용을 보고 판단해서 실행 여부 결정
-6. 다시 종료 시도 시 `stop_hook_active=true` 플래그가 설정되어 hook이 조용히 통과 (무한 루프 방지)
+1. When Claude tries to end its turn, `anchor-hook.py` runs.
+2. It checks whether the current working directory contains `FEATURE_CONTEXT.md`.
+3. **If it exists** → "If this session had substantive work, update it with `/anchor`."
+4. **If it does not** → "If this session had substantive work, create one with `/anchor` (self-bootstrap)."
+5. Claude inspects the session and decides whether to run `/anchor`.
+6. On the next stop attempt, `stop_hook_active=true` is set, so the hook exits silently (no infinite loop).
 
-"substantive work"의 범위는 넓게 잡습니다 — 기능 구현, 테스트 인프라, 로깅 전략, 배포 파이프라인, 아키텍처 리팩터링, 툴링 셋업 등 **설계 선택이 개입된 모든 작업**이 포함됩니다. 빠른 질문이나 단순 버그 수정에는 Claude가 "substantive 아님"이라고 판단해서 그냥 종료합니다.
+"Substantive work" is interpreted broadly — feature implementation, test infrastructure, logging strategy, deployment pipelines, architectural refactors, tooling setup, anything that **involves design choices**. For quick questions or trivial fixes, Claude will judge it "not substantive" and end the turn without anchoring.
 
-즉, **피처 시작부터 종료까지 수동 개입 없이 자동으로 anchor가 관리됩니다.** 물론 수동으로도 언제든 `/anchor`, `/anchor-graduate`를 실행할 수 있습니다.
+The result: **anchoring is managed automatically from feature kickoff through completion.** You can always run `/anchor` and `/anchor-graduate` manually as well.
 
-자동화를 원치 않는 경우 `~/.claude/settings.json`의 `Stop` hook 부분만 제거하거나 `anchor-hook.py`를 삭제하세요.
+To disable the automation, remove the `Stop` hook section from `~/.claude/settings.json` or delete `anchor-hook.py`.
 
-## 전체 워크플로
+## Full workflow
 
 ```
-substantive work 시작
+substantive work starts
     ↓
-/anchor   (또는 auto-trigger)
-    → FEATURE_CONTEXT.md 없으면 생성, 있으면 업데이트
-    → 결정 / 이유 / 거절한 대안 / 제약 / 진행 상태 기록
+/anchor   (manual or auto-triggered)
+    → creates FEATURE_CONTEXT.md if missing, otherwise updates it
+    → records decisions / rationale / rejected alternatives / constraints / state
     ↓
-(반복: 다음 세션 시작 시 FEATURE_CONTEXT.md 공유 → 30초 컨텍스트 복구)
+(loop: at the next session, share FEATURE_CONTEXT.md with Claude → ~30s context recovery)
     ↓
-피처 완료
+feature complete
     ↓
 /anchor-graduate
-    → 핵심 결정들을 docs/adr/NNNN-*.md 로 승격
-    → FEATURE_CONTEXT.md 완료 처리 후 삭제 가능
+    → graduates key decisions into docs/adr/NNNN-*.md
+    → marks FEATURE_CONTEXT.md complete; safe to delete afterwards
 ```
 
-## 커맨드 설명
+## Commands
 
-| 커맨드 | 시점 | 역할 |
-|--------|------|------|
-| `/anchor [기능명?]` | 세션 중/종료 시 (또는 자동) | `FEATURE_CONTEXT.md` 생성 또는 업데이트 |
-| `/anchor-graduate` | 피처 완료 시 | 핵심 결정을 `docs/adr/`에 ADR로 승격 |
+| Command | When | Role |
+|---------|------|------|
+| `/anchor [feature-name?]` | During or at the end of a session (or auto) | Create or update `FEATURE_CONTEXT.md` |
+| `/anchor-graduate` | When a feature is complete | Promote key decisions into `docs/adr/` ADRs |
 
-> 구버전의 `/anchor-init`은 `/anchor`에 통합되었습니다. `/anchor`가 파일이 없으면 자동 생성하고, 있으면 업데이트합니다.
+> The old `/anchor-init` command has been merged into `/anchor`. `/anchor` creates the file if missing and updates it if present.
 
-## 왜 필요한가?
+## Why this exists
 
-AI 세션은 기본적으로 휘발성입니다. 대화가 길어질수록 초반 결정의 *이유*가 먼저 사라집니다.
-이 커맨드들은 "무엇을 했는가"뿐 아니라 "왜 했는가", "무엇을 거절했는가"를 로컬에 영구 보존합니다.
+AI sessions are volatile by default. The longer a conversation runs, the sooner the *reasons* behind early decisions fade. These commands persist "why we did it" and "what we rejected" alongside "what we did".
 
-- `FEATURE_CONTEXT.md` — 작업 일지. 피처가 살아있는 동안 계속 업데이트.
-- `docs/adr/` — 교훈. 미래에도 가치 있는 결정만 선별해서 영구 보존.
+- `FEATURE_CONTEXT.md` — work diary. Lives as long as the feature is in flight.
+- `docs/adr/` — lessons. Only decisions whose rationale still matters in the future.
 
-**리트머스 테스트**: 지금 세션을 닫고 새로 시작해도 불안하지 않으면, 컨텍스트가 잘 고정된 것입니다.
+**Litmus test**: if you can close this session and start a new one tomorrow without feeling anxious about lost context, anchoring worked.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
