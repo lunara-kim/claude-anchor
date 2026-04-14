@@ -4,23 +4,65 @@ Martin Fowler의 [Context Anchoring](https://martinfowler.com/articles/reduce-fr
 
 ## 설치
 
-### 개인용 (모든 프로젝트에서 사용)
+### 원라이너 (권장)
+
 ```bash
-mkdir -p ~/.claude/commands
-cp anchor.md ~/.claude/commands/
-cp anchor-init.md ~/.claude/commands/
-cp anchor-graduate.md ~/.claude/commands/
+curl -fsSL https://raw.githubusercontent.com/lunara-kim/claude-anchor/main/install.sh | bash
 ```
 
-그리고 `settings.json`을 `~/.claude/settings.json`에 병합하면 **자동 anchor 리마인더**가 활성화됩니다 (아래 "자동 Anchor" 참고).
+스크립트가 하는 일:
+- `~/.claude/commands/`에 anchor 커맨드 3개 복사
+- `~/.claude/settings.json`에 Stop hook 병합 (기존 설정 보존, 백업 생성)
+- 이미 설치되어 있으면 hook을 깔끔히 교체 (중복 방지)
 
-### 프로젝트용 (해당 프로젝트에서만 사용 + git으로 팀 공유)
+> `jq`가 필요합니다 (settings.json 안전 병합용). 없으면 스크립트가 안내합니다.
+
+### 수동 설치
+
+```bash
+git clone https://github.com/lunara-kim/claude-anchor
+cd claude-anchor
+./install.sh
+```
+
+또는 완전 수동:
+```bash
+mkdir -p ~/.claude/commands
+cp anchor.md anchor-init.md anchor-graduate.md ~/.claude/commands/
+# settings.json은 기존 파일과 수동 병합
+```
+
+### 프로젝트용 (팀 공유)
+
 ```bash
 mkdir -p .claude/commands
-cp anchor.md .claude/commands/
-cp anchor-init.md .claude/commands/
-cp anchor-graduate.md .claude/commands/
+cp anchor.md anchor-init.md anchor-graduate.md .claude/commands/
 cp settings.json .claude/settings.json
+```
+
+## 업데이트
+
+설치 방식에 따라:
+
+**원라이너로 설치한 경우** — 같은 커맨드 재실행
+```bash
+curl -fsSL https://raw.githubusercontent.com/lunara-kim/claude-anchor/main/install.sh | bash
+```
+기존 hook은 마커로 식별해 교체하므로 중복되지 않습니다. settings.json은 실행 시마다 타임스탬프 백업됩니다.
+
+**git clone으로 설치한 경우**
+```bash
+cd claude-anchor && git pull && ./install.sh
+```
+
+**symlink로 설치한 경우** (고급) — 소스를 한 번만 clone하고 심볼릭 링크
+```bash
+git clone https://github.com/lunara-kim/claude-anchor ~/src/claude-anchor
+ln -sf ~/src/claude-anchor/anchor.md        ~/.claude/commands/
+ln -sf ~/src/claude-anchor/anchor-init.md   ~/.claude/commands/
+ln -sf ~/src/claude-anchor/anchor-graduate.md ~/.claude/commands/
+# 업데이트는 git pull만 하면 자동 반영
+cd ~/src/claude-anchor && git pull
 ```
 
 ## 자동 Anchor (기본 동작)
