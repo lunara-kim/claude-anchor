@@ -12,13 +12,28 @@ cp anchor-init.md ~/.claude/commands/
 cp anchor-graduate.md ~/.claude/commands/
 ```
 
+그리고 `settings.json`을 `~/.claude/settings.json`에 병합하면 **자동 anchor 리마인더**가 활성화됩니다 (아래 "자동 Anchor" 참고).
+
 ### 프로젝트용 (해당 프로젝트에서만 사용 + git으로 팀 공유)
 ```bash
 mkdir -p .claude/commands
 cp anchor.md .claude/commands/
 cp anchor-init.md .claude/commands/
 cp anchor-graduate.md .claude/commands/
+cp settings.json .claude/settings.json
 ```
+
+## 자동 Anchor (기본 동작)
+
+사용자가 `/anchor` 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다.
+
+- Claude 응답이 끝날 때마다 현재 디렉토리에 `FEATURE_CONTEXT.md`가 있는지 확인
+- 존재하면 Claude에게 "이번 세션에 의미 있는 변경이 있었다면 `/anchor`를 실행하라"는 리마인더 주입
+- Claude가 세션 내용을 보고 anchor 필요 여부를 판단 → 자동 업데이트
+
+즉, `/anchor-init`으로 피처를 시작한 순간부터 세션 종료 전에 자동으로 anchor가 수행됩니다. 수동으로도 언제든 `/anchor` 실행 가능합니다.
+
+자동화를 원치 않는 경우 `settings.json`의 `Stop` hook 부분만 제거하세요.
 
 ## 전체 워크플로
 

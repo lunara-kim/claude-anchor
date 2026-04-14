@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f FEATURE_CONTEXT.md ] && echo 'A FEATURE_CONTEXT.md exists in this project. If meaningful decisions, rejected alternatives, new constraints, or progress were made in this session, run /anchor now to update it before the session ends. Skip if no substantive changes.' || true"
+          }
+        ]
+      }
+    ]
+  }
+}
