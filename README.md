@@ -25,13 +25,16 @@ cp settings.json .claude/settings.json
 
 ## 자동 Anchor (기본 동작)
 
-사용자가 `/anchor` 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다.
+사용자가 커맨드 실행을 까먹어도 컨텍스트가 날아가지 않도록, `settings.json`에 **Stop hook**이 포함되어 있습니다.
 
-- Claude 응답이 끝날 때마다 현재 디렉토리에 `FEATURE_CONTEXT.md`가 있는지 확인
-- 존재하면 Claude에게 "이번 세션에 의미 있는 변경이 있었다면 `/anchor`를 실행하라"는 리마인더 주입
-- Claude가 세션 내용을 보고 anchor 필요 여부를 판단 → 자동 업데이트
+Claude 응답이 끝날 때마다 현재 디렉토리를 체크해서 Claude에게 조건부 지시를 주입합니다:
 
-즉, `/anchor-init`으로 피처를 시작한 순간부터 세션 종료 전에 자동으로 anchor가 수행됩니다. 수동으로도 언제든 `/anchor` 실행 가능합니다.
+- **`FEATURE_CONTEXT.md`가 있으면** → "의미 있는 변경이 있었으면 `/anchor` 실행하라"
+- **없으면** → "이번 세션이 substantive한 피처 작업이었으면 `/anchor-init` 실행하라"
+
+Claude가 세션 내용을 보고 판단하기 때문에, 빠른 질문이나 단순 수정에는 반응하지 않고, 실제 피처 작업일 때만 자동으로 생성/업데이트됩니다.
+
+즉, **피처 시작부터 종료까지 수동 개입 없이 자동으로 anchor가 관리됩니다.** 물론 수동으로도 언제든 `/anchor-init`, `/anchor`, `/anchor-graduate` 실행 가능합니다.
 
 자동화를 원치 않는 경우 `settings.json`의 `Stop` hook 부분만 제거하세요.
 
