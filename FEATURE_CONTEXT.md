@@ -27,6 +27,8 @@ _Created: 2026-04-15 | Last updated: 2026-04-15 (r2)_
 - `anchor-hook.py` must stick to Python 3.6+ syntax (widely available).
 - Hook path is fixed to `$HOME/.claude/anchor-hook.py` — supporting alternatives would complicate settings.json synchronization.
 - Slash command files must live at `.claude/commands/*.md` per the Claude Code spec.
+- `awesome-claude-code` enforces **"resources must be at least one week old"** — submission window opens 2026-04-21 at the earliest (repo created 2026-04-14).
+- `awesome-claude-code` submissions must come from the **github.com web UI issue form**; `gh` CLI programmatic submission is an auto-close offense. `gh issue create --web` is acceptable because it only opens a browser.
 
 ## Open Questions
 
@@ -48,7 +50,8 @@ _Created: 2026-04-15 | Last updated: 2026-04-15 (r2)_
 - [x] README rewritten end-to-end (install / update / workflow)
 - [x] Translate command docs and README to English (Korean kept in `README.ko.md`)
 - [ ] Actual macOS / Linux testing
-- [ ] Submit to awesome-claude-code via Issue Form (Hooks category) — note: PR/gh-CLI submissions are explicitly forbidden by that project
+- [ ] Submit to awesome-claude-code via Issue Form (Hooks category) — gated by the "1 week old" rule; earliest window 2026-04-21
+- [ ] During the wait: macOS/Linux install verification, short demo snippet in README, CONTRIBUTING Tips & Tricks compliance pass
 - [ ] Long-term observation of auto-trigger behavior in real projects (e.g., meeting-scribe)
 
 ## Session Log
@@ -77,3 +80,4 @@ _Created: 2026-04-15 | Last updated: 2026-04-15 (r2)_
 - Researched `awesome-claude-code` submission process — **Issue Form only; PR/gh-CLI submissions are forbidden and risk ban**.
 - Investigated `/add-to-changelog` (berrydev-ai, MIT) — decided **not** to bundle; keep claude-anchor scope tight to Context Anchoring.
 - Decided to submit under the **Hooks** category rather than Slash-Commands. Reasons: fewer peers (11 vs 47), the Stop-hook mechanism is the novel contribution, no existing context-anchoring entry in Hooks.
+- Read the `recommend-resource.yml` issue template — discovered two gating rules: (1) resources must be at least **one week old** (blocks submission until 2026-04-21), (2) `gh` CLI programmatic submission is forbidden (auto-close), only web UI or `gh issue create --web` allowed. Deferred submission; lined up pre-submission work (macOS/Linux test, demo snippet, CONTRIBUTING Tips compliance).
