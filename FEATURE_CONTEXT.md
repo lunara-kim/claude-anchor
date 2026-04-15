@@ -1,5 +1,5 @@
 # Feature: claude-anchor — Context Anchoring slash-command tool
-_Created: 2026-04-15 | Last updated: 2026-04-15_
+_Created: 2026-04-15 | Last updated: 2026-04-15 (r2)_
 
 > This file is a Context Anchoring document.
 > Share it with Claude when starting a new session.
@@ -17,6 +17,8 @@ _Created: 2026-04-15 | Last updated: 2026-04-15_
 | Prefer `jq` and fall back to `python3`/`python` when merging settings.json during install | `jq` is not bundled with Windows Git Bash. Python is almost always available on Windows / macOS / Linux. Auto-installing packages is avoided due to sudo/trust issues. | Require `jq` (barrier for Windows users). / Auto-install `jq` (OS-specific, permission-heavy). / Manual-merge instructions only (worst UX). |
 | Automatically remove `anchor-init.md` when upgrading from older versions | If left behind, `/anchor-init` remains visible to users and causes confusion about a removed command. Naming the vanished command makes the migration clean. | Leave it and warn in README (invites mistakes). / Ship a deprecation-stub file (dead code). |
 | Define "substantive work" for the Stop hook **broadly** (testing / logging / deploy / tooling included) | In the meeting-scribe project, introducing a test suite was interpreted as "not feature work", so auto-init did not fire. Anything involving design choices should qualify. | Narrow definition ("only feature implementation") — already disproved in practice. / Include everything — fires on quick questions too, causing noise. |
+| Submit to `awesome-claude-code` under the **Hooks** category, not Slash-Commands | The novelty of claude-anchor is the Stop hook mechanism (`decision:block` + `stop_hook_active`), which was the hard-earned part. Hooks section has ~11 entries with no context-anchoring peer; Slash-Commands has 47 entries across 7 subcategories including "Context Loading & Priming" and "Documentation & Changelogs" where claude-anchor would blend in. Hook-first framing also writes a sharper description. | Submit under Slash-Commands/Context Loading & Priming (more competition, weaker differentiation). / Submit to both (the issue form is single-category). |
+| Do not bundle `/add-to-changelog` (berrydev-ai) or similar adjacent commands into claude-anchor | Scope is Context Anchoring — decisions/rationale persistence. Changelog management is a different concern with its own conventions (Keep a Changelog, SemVer) and would dilute the tool's identity and complicate category choice. | Fork berrydev-ai's MIT-licensed command into this repo (scope creep, learning overhead). / Build a thin `/anchor-graduate` → CHANGELOG integration (extra surface area for uncertain value). |
 
 ## Constraints
 
@@ -46,7 +48,7 @@ _Created: 2026-04-15 | Last updated: 2026-04-15_
 - [x] README rewritten end-to-end (install / update / workflow)
 - [x] Translate command docs and README to English (Korean kept in `README.ko.md`)
 - [ ] Actual macOS / Linux testing
-- [ ] Submit PR to awesome-claude-code
+- [ ] Submit to awesome-claude-code via Issue Form (Hooks category) — note: PR/gh-CLI submissions are explicitly forbidden by that project
 - [ ] Long-term observation of auto-trigger behavior in real projects (e.g., meeting-scribe)
 
 ## Session Log
@@ -70,3 +72,8 @@ _Created: 2026-04-15 | Last updated: 2026-04-15_
 - Verified live hook firing (`Stop hook feedback` observed in this session).
 - Wrote this `FEATURE_CONTEXT.md` for the tool itself (meta-anchoring).
 - Translated command docs and README to English for community distribution; preserved the Korean README as `README.ko.md`. Target: submit to `awesome-claude-code`.
+- Committed and pushed English docs (`0f75f1c`); tagged `v0.1.0`; added 8 GitHub topics (`claude-code`, `claude-code-hooks`, `claude-code-commands`, `slash-commands`, `context-anchoring`, `adr`, `anthropic`, `ai-tooling`).
+- Installed `gh` CLI via `winget` and authenticated as `lunara-kim`.
+- Researched `awesome-claude-code` submission process — **Issue Form only; PR/gh-CLI submissions are forbidden and risk ban**.
+- Investigated `/add-to-changelog` (berrydev-ai, MIT) — decided **not** to bundle; keep claude-anchor scope tight to Context Anchoring.
+- Decided to submit under the **Hooks** category rather than Slash-Commands. Reasons: fewer peers (11 vs 47), the Stop-hook mechanism is the novel contribution, no existing context-anchoring entry in Hooks.
