@@ -86,6 +86,91 @@ The result: **anchoring is managed automatically from feature kickoff through co
 
 To disable the automation, remove the `Stop` hook section from `~/.claude/settings.json` or delete `anchor-hook.py`.
 
+## What this touches (transparency)
+
+claude-anchor is local-only and makes no runtime network calls. Here is exactly what gets written and fetched.
+
+**Files created or modified by `install.sh`:**
+- `~/.claude/commands/anchor.md` — written
+- `~/.claude/commands/anchor-graduate.md` — written
+- `~/.claude/anchor-hook.py` — written
+- `~/.claude/commands/anchor-init.md` — **deleted** if present (legacy cleanup)
+- `~/.claude/settings.json` — merged (adds one `Stop` hook entry); a timestamped backup `settings.json.bak.YYYYMMDDHHMMSS` is created on every run
+
+**Files created by the commands themselves (in your project directory):**
+- `./FEATURE_CONTEXT.md` — created or updated by `/anchor`
+- `./docs/adr/NNNN-*.md` — created by `/anchor-graduate`
+
+**Network requests:**
+- `install.sh`, when run via the curl one-liner, downloads `anchor.md`, `anchor-graduate.md`, `anchor-hook.py`, and `settings.json` from `raw.githubusercontent.com/lunara-kim/claude-anchor/main/`.
+- After installation, nothing in this project makes network calls. `anchor-hook.py` and the slash commands only read/write local files.
+
+**No telemetry. No auto-update. No elevated permissions required.** The installer does not call `sudo` and does not require `--dangerously-skip-permissions`.
+
+## Uninstall
+
+```bash
+# Remove the slash commands
+rm -f ~/.claude/commands/anchor.md ~/.claude/commands/anchor-graduate.md
+
+# Remove the hook script
+rm -f ~/.claude/anchor-hook.py
+
+# Remove the Stop hook from settings.json
+#   Option 1: restore from the backup that install.sh created
+#     ls ~/.claude/settings.json.bak.*       # pick the most recent
+#     cp ~/.claude/settings.json.bak.<TS> ~/.claude/settings.json
+#
+#   Option 2: edit ~/.claude/settings.json by hand and delete the hook entry
+#     whose command references "anchor-hook.py"
+```
+
+`FEATURE_CONTEXT.md` and `docs/adr/` files in your project are yours to keep or delete. Nothing else is left behind.
+
+## Demo — a minimal end-to-end session
+
+A reproducible trace. Try this in a scratch directory after installing.
+
+```text
+$ mkdir demo && cd demo
+$ claude
+> We're adding email notifications. Use SES, not SendGrid —
+> we already have an SES account in this AWS org and legal
+> has cleared it. Sketch the sender module.
+
+[Claude writes src/notifier.py with an SES client]
+
+> ok that looks good, let's stop here
+
+[Stop hook fires — Claude sees the reminder and runs /anchor]
+
+/anchor
+→ FEATURE_CONTEXT.md created with:
+    Decisions:
+      | Use AWS SES for email sending | Existing SES account in AWS
+        org; legal has cleared SES but not SendGrid | SendGrid
+        (extra vendor, not cleared); raw SMTP (no deliverability) |
+    State:
+      [x] Sketch sender module (src/notifier.py)
+      [ ] Wire templates
+      [ ] Retry / DLQ strategy
+
+# Close the session. Next day:
+$ claude
+> Here's the context: @FEATURE_CONTEXT.md
+> Continue from where we left off.
+
+[Claude reads the file, knows WHY SES was chosen, picks up at "Wire templates"]
+
+# When the feature ships:
+/anchor-graduate
+→ docs/adr/0001-use-ses-for-email-sending.md  (Context, Decision,
+    Rationale, Rejected Alternatives, Consequences)
+→ FEATURE_CONTEXT.md marked ✅ Completed
+```
+
+The point: the *reason* "SES, not SendGrid, because legal cleared it" survives the session boundary. Without anchoring, it tends to decay into "we chose SES" within a few days.
+
 ## Full workflow
 
 ```
